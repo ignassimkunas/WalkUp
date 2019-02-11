@@ -39,9 +39,16 @@ import java.util.List;
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
 
     private GoogleMap mMap;
-    List<LatLng> latLngList;
-    LocationManager locationManager;
-    LocationListener locationListener;
+    private List<LatLng> latLngList;
+    private LocationManager locationManager;
+    private LocationListener locationListener;
+    private Button startButton;
+    private boolean ifActive;
+    private ArrayList<Float> distances;
+    private ArrayList<Float> smallDistances;
+    private SQLiteDatabase database;
+    private int markerCount = 0;
+    Polyline line;
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -87,17 +94,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
-    Polyline line;
-    Button startButton;
-    ListView listView;
-    boolean ifActive;
-    ArrayList<Float> distances;
-    ArrayList<Float> smallDistances;
-    SQLiteDatabase database;
-    int markerCount = 0;
-
     @Override
     public void onMapReady(GoogleMap googleMap) {
+
+        final ArrayAdapter adapter = new ArrayAdapter(this, android.R.layout.simple_list_item_1, distances);
+        ListView listView = findViewById(R.id.listView);
+
         mMap = googleMap;
 
         ifActive = false;
@@ -137,9 +139,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
 
         startButton = findViewById(R.id.startButton);
-        listView = findViewById(R.id.listView);
-
-        final ArrayAdapter adapter = new ArrayAdapter(this, android.R.layout.simple_list_item_1, distances);
 
         listView.setAdapter(adapter);
 
@@ -147,6 +146,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
             startButton.setBackgroundColor(Color.RED);
             startButton.setText("Stop journey");
+            centerMapOnLocation();
 
         }
         else {
