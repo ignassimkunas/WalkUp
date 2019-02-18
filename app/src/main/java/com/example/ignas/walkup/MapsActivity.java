@@ -48,6 +48,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private ArrayList<Float> smallDistances;
     private SQLiteDatabase database;
     private int markerCount = 0;
+    List<Trips> tripsList;
+    ArrayAdapter adapter;
     Polyline line;
 
     @Override
@@ -59,9 +61,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
 
                 locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
-
                 centerMapOnLocation();
-
             }
         }
     }
@@ -76,17 +76,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mapFragment.getMapAsync(this);
     }
 
-    Location lastKnownLocation;
+    Location location;
     public void centerMapOnLocation() {
+
+        mMap.clear();
 
         if (ContextCompat.checkSelfPermission(MapsActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED){
 
             locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 1, locationListener);
-            lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
 
         }
 
-        LatLng userLocation = new LatLng(lastKnownLocation.getLatitude(), lastKnownLocation.getLongitude());
+        LatLng userLocation = new LatLng(location.getLatitude(), location.getLongitude());
 
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation, 15));
 
@@ -97,7 +99,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     public void onMapReady(GoogleMap googleMap) {
 
-        final ArrayAdapter adapter = new ArrayAdapter(this, android.R.layout.simple_list_item_1, distances);
         ListView listView = findViewById(R.id.listView);
 
         mMap = googleMap;
@@ -108,39 +109,77 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         latLngList = new ArrayList<>();
         smallDistances = new ArrayList<>();
 
+        tripsList = new ArrayList<>();
+
+        adapter = new TripList(MapsActivity.this, tripsList);
+
         try {
 
             database = this.openOrCreateDatabase("Distances", MODE_PRIVATE, null);
-
             database.execSQL("CREATE TABLE IF NOT EXISTS distances (distance FLOAT(3))");
 
             Cursor c = database.rawQuery("SELECT * FROM distances", null);
 
             int distanceIndex = c.getColumnIndex("distance");
-
-            distances.clear();
-
+            tripsList.clear();
             c.moveToFirst();
 
             while (c != null){
 
-                distances.add(c.getFloat(distanceIndex));
-
+                Trips trips = new Trips(null, null, c.getFloat(distanceIndex));
+                tripsList.add(trips);
                 c.moveToNext();
-
             }
-
         }
-
         catch (Exception e){
 
             e.printStackTrace();
-
         }
 
         startButton = findViewById(R.id.startButton);
-
         listView.setAdapter(adapter);
+
+        locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+
+        locationListener = new LocationListener() {
+            public void onLocationChanged(Location location) {
+
+                if (ifActive){
+
+                    LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+                    latLngList.add(latLng);
+                    markerCount++;
+
+                    float[] results = new float[10];
+
+                    if (markerCount > 1){
+
+                        Location.distanceBetween(latLngList.get(markerCount - 1).latitude, latLngList.get(markerCount - 1).longitude, latLngList.get(markerCount - 2).latitude, latLngList.get(markerCount - 2).longitude, results);
+                    }
+
+                    smallDistances.add(results[0]);
+                    line = mMap.addPolyline(new PolylineOptions()
+                            .addAll(latLngList)
+                            .width(25f)
+                            .color(Color.RED));
+                }
+            }
+
+            @Override
+            public void onStatusChanged(String provider, int status, Bundle extras) {
+
+            }
+
+            @Override
+            public void onProviderEnabled(String provider) {
+
+            }
+
+            @Override
+            public void onProviderDisabled(String provider) {
+
+            }
+        };
 
         if (ifActive){
 
@@ -153,6 +192,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
             startButton.setBackgroundColor(Color.GREEN);
             startButton.setText("Start journey");
+            centerMapOnLocation();
 
         }
 
@@ -160,10 +200,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             @Override
             public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
 
-                database.execSQL("DELETE FROM distances WHERE distance = " + Float.toString(distances.get(position)));
-
-                distances.remove(position);
-
+                database.execSQL("DELETE FROM distances WHERE distance = " + Float.toString(tripsList.get(position).distance));
+                tripsList.remove(position);
                 adapter.notifyDataSetChanged();
                 return true;
             }
@@ -175,37 +213,28 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                 if (ifActive){
 
+                    centerMapOnLocation();
                     startButton.setBackgroundColor(Color.GREEN);
                     startButton.setText("Start journey");
-
                     ifActive = false;
-
                     float distanceSum = 0;
-
                     if (latLngList.size() != 0){
 
                         markerCount = 0;
-
                         for (int i = 0; i < smallDistances.size(); i++){
 
                             distanceSum += smallDistances.get(i);
                         }
-
-                        distances.add(distanceSum /1000);
-
+                        Trips trips = new Trips(null, null, distanceSum/1000);
+                        tripsList.add(trips);
                         database.execSQL("INSERT INTO distances (distance) VALUES (" + Float.toString(distanceSum/1000) + " )");
-
                         smallDistances.clear();
-
                         adapter.notifyDataSetChanged();
-
                     }
-
                 }
                 else {
-
+                    centerMapOnLocation();
                     ifActive = true;
-
                     startButton.setBackgroundColor(Color.RED);
                     startButton.setText("Stop journey");
                     latLngList.clear();
@@ -215,68 +244,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         });
 
-        locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
-
-            locationListener = new LocationListener() {
-                public void onLocationChanged(Location location) {
-
-                    if (ifActive){
-
-                        LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-
-                        latLngList.add(latLng);
-
-                        markerCount++;
-
-                        float[] results = new float[10];
-
-                        if (markerCount > 1){
-
-                            Location.distanceBetween(latLngList.get(markerCount - 1).latitude, latLngList.get(markerCount - 1).longitude, latLngList.get(markerCount - 2).latitude, latLngList.get(markerCount - 2).longitude, results);
-
-                        }
-
-                        smallDistances.add(results[0]);
-
-                        line = mMap.addPolyline(new PolylineOptions()
-                                .addAll(latLngList)
-                                .width(25f)
-                                .color(Color.RED));
-
-                    }
-
-                }
-
-                @Override
-                public void onStatusChanged(String provider, int status, Bundle extras) {
-
-                }
-
-                @Override
-                public void onProviderEnabled(String provider) {
-
-                }
-
-                @Override
-                public void onProviderDisabled(String provider) {
-
-                }
-            };
-
-
-
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED){
 
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 15, locationListener);
-
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 15000, 0, locationListener);
             Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-
             LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-
             mMap.addMarker(new MarkerOptions().position(latLng));
-
             centerMapOnLocation();
-
         }
         else {
 
