@@ -28,8 +28,10 @@ public class TripList extends ArrayAdapter<Trips> {
 
         View listViewItem = inflater.inflate(R.layout.list_layout, null, true);
 
-        TextView distance = listViewItem.findViewById(R.id.textView);
+        TextView distance = listViewItem.findViewById(R.id.distance);
+        TextView time = listViewItem.findViewById(R.id.time);
 
+        time.setText(Long.toString(tripsList.get(position).time));
         distance.setText(Double.toString(tripsList.get(position).distance));
 
         return listViewItem;

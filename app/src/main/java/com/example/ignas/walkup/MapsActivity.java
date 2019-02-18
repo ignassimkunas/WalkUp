@@ -10,6 +10,7 @@ import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
@@ -20,6 +21,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.Chronometer;
 import android.widget.ListView;
 import android.widget.Toast;
 
@@ -50,6 +52,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private int markerCount = 0;
     List<Trips> tripsList;
     ArrayAdapter adapter;
+    Chronometer chronometer;
     Polyline line;
 
     @Override
@@ -115,18 +118,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         try {
 
-            database = this.openOrCreateDatabase("Distances", MODE_PRIVATE, null);
-            database.execSQL("CREATE TABLE IF NOT EXISTS distances (distance FLOAT(3))");
+            database = this.openOrCreateDatabase("Walkup", MODE_PRIVATE, null);
+            database.execSQL("CREATE TABLE IF NOT EXISTS distances (distance FLOAT(5), time INT(5))");
 
             Cursor c = database.rawQuery("SELECT * FROM distances", null);
 
             int distanceIndex = c.getColumnIndex("distance");
+            int timeIndex = c.getColumnIndex("time");
+
             tripsList.clear();
             c.moveToFirst();
 
             while (c != null){
 
-                Trips trips = new Trips(null, null, c.getFloat(distanceIndex));
+                Trips trips = new Trips(null, c.getLong(timeIndex), c.getFloat(distanceIndex));
                 tripsList.add(trips);
                 c.moveToNext();
             }
@@ -160,7 +165,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     smallDistances.add(results[0]);
                     line = mMap.addPolyline(new PolylineOptions()
                             .addAll(latLngList)
-                            .width(25f)
+                            .width(20f)
                             .color(Color.RED));
                 }
             }
@@ -181,18 +186,33 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         };
 
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED){
+
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 15000, 0, locationListener);
+            Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+            mMap.addMarker(new MarkerOptions().position(latLng));
+            centerMapOnLocation();
+        }
+        else {
+
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+
+        }
+
         if (ifActive){
 
             startButton.setBackgroundColor(Color.RED);
             startButton.setText("Stop journey");
+
             centerMapOnLocation();
 
         }
         else {
 
+
             startButton.setBackgroundColor(Color.GREEN);
             startButton.setText("Start journey");
-            centerMapOnLocation();
 
         }
 
@@ -214,6 +234,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 if (ifActive){
 
                     centerMapOnLocation();
+
+                    long ellapsedMillis = SystemClock.elapsedRealtime() - chronometer.getBase();
+
+
                     startButton.setBackgroundColor(Color.GREEN);
                     startButton.setText("Start journey");
                     ifActive = false;
@@ -225,15 +249,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                             distanceSum += smallDistances.get(i);
                         }
-                        Trips trips = new Trips(null, null, distanceSum/1000);
+                        Trips trips = new Trips(null, ellapsedMillis/1000, distanceSum/1000);
+
+                        Toast.makeText(MapsActivity.this, Long.toString(ellapsedMillis/1000), Toast.LENGTH_SHORT).show();
                         tripsList.add(trips);
-                        database.execSQL("INSERT INTO distances (distance) VALUES (" + Float.toString(distanceSum/1000) + " )");
+                        database.execSQL("INSERT INTO distances (distance, time) VALUES (" + Float.toString(distanceSum/1000) + "," + Long.toString(ellapsedMillis/1000) + " )");
                         smallDistances.clear();
                         adapter.notifyDataSetChanged();
                     }
                 }
                 else {
                     centerMapOnLocation();
+
+                    chronometer = findViewById(R.id.chronometer);
+                    chronometer.setBase(SystemClock.elapsedRealtime());
+                    chronometer.start();
+
                     ifActive = true;
                     startButton.setBackgroundColor(Color.RED);
                     startButton.setText("Stop journey");
@@ -243,19 +274,5 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
             }
         });
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED){
-
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 15000, 0, locationListener);
-            Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-            LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-            mMap.addMarker(new MarkerOptions().position(latLng));
-            centerMapOnLocation();
-        }
-        else {
-
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
-
-        }
     }
 }
