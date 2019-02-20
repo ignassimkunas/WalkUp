@@ -30,6 +30,7 @@ public class TripList extends ArrayAdapter<Trips> {
 
         TextView distance = listViewItem.findViewById(R.id.distance);
         TextView time = listViewItem.findViewById(R.id.time);
+        TextView avgSpeed = listViewItem.findViewById(R.id.avg_speed);
 
         long minutes = tripsList.get(position).time / 60;
         long seconds = tripsList.get(position).time - minutes * 60;
@@ -40,10 +41,10 @@ public class TripList extends ArrayAdapter<Trips> {
             secondString = "0" + Long.toString(seconds);
         }
 
-        double round = Math.round(tripsList.get(position).distance * 100.0) / 100.0;
         time.setText(Long.toString(minutes) + ":" + secondString);
 
-        distance.setText(Double.toString(round)+ "km");
+        distance.setText(Double.toString(tripsList.get(position).distance)+ "km");
+        avgSpeed.setText(Double.toString(tripsList.get(position).avgSpeed)+"km/h");
 
         return listViewItem;
     }

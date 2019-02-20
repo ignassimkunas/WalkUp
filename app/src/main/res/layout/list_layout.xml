@@ -18,4 +18,11 @@
         android:layout_height="wrap_content"
         android:text="TextView"
         android:textSize="30sp" />
+
+    <TextView
+        android:id="@+id/avg_speed"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="TextView"
+        android:textSize="30sp" />
 </LinearLayout>

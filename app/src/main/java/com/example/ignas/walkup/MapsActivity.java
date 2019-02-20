@@ -118,20 +118,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         try {
 
-            database = this.openOrCreateDatabase("Walkup", MODE_PRIVATE, null);
-            database.execSQL("CREATE TABLE IF NOT EXISTS distances (distance FLOAT(5), time INT(5))");
+            database = this.openOrCreateDatabase("walk", MODE_PRIVATE, null);
+            database.execSQL("CREATE TABLE IF NOT EXISTS distances (distance DOUBLE(5), time INT(5), avgSpeed DOUBLE(5))");
 
             Cursor c = database.rawQuery("SELECT * FROM distances", null);
 
             int distanceIndex = c.getColumnIndex("distance");
             int timeIndex = c.getColumnIndex("time");
+            int avgSpeedIndex = c.getColumnIndex("avgSpeed");
 
             tripsList.clear();
             c.moveToFirst();
 
             while (c != null){
 
-                Trips trips = new Trips(null, c.getLong(timeIndex), c.getFloat(distanceIndex));
+                Trips trips = new Trips(null, c.getLong(timeIndex), c.getDouble(distanceIndex), c.getDouble(avgSpeedIndex));
                 tripsList.add(trips);
                 c.moveToNext();
             }
@@ -220,7 +221,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             @Override
             public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
 
-                database.execSQL("DELETE FROM distances WHERE distance = " + Float.toString(tripsList.get(position).distance));
+                database.execSQL("DELETE FROM distances WHERE distance = " + Double.toString(tripsList.get(position).distance));
                 tripsList.remove(position);
                 adapter.notifyDataSetChanged();
                 return true;
@@ -237,7 +238,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                     long ellapsedMillis = SystemClock.elapsedRealtime() - chronometer.getBase();
 
-
                     startButton.setBackgroundColor(Color.GREEN);
                     startButton.setText("Start journey");
                     ifActive = false;
@@ -249,7 +249,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                             distanceSum += smallDistances.get(i);
                         }
-                        Trips trips = new Trips(null, ellapsedMillis/1000, distanceSum/1000);
+                        double avgSpeed;
+                        double distRound = Math.round(distanceSum/1000 * 100.0) / 100.0;
+                        long timeSec = ellapsedMillis / 1000;
+                        if (distRound == 0 || timeSec == 0) {
+                            avgSpeed = 0;
+                        }
+                        else {
+                            avgSpeed = distRound / (Math.round(timeSec/3600 * 100.0) / 100.0);
+                        }
+                        Trips trips = new Trips(null, timeSec, distRound, avgSpeed);
 
                         Toast.makeText(MapsActivity.this, Long.toString(ellapsedMillis/1000), Toast.LENGTH_SHORT).show();
                         tripsList.add(trips);
@@ -271,7 +280,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     latLngList.clear();
 
                 }
-
             }
         });
     }
