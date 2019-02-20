@@ -3,14 +3,14 @@ package com.example.ignas.walkup;
 public class Trips {
 
     String date;
-    String time;
+    long time;
     float distance;
 
     public Trips() {
 
     }
 
-    public Trips (String date, String time, float distance) {
+    public Trips (String date, long time, float distance) {
 
         this.date = date;
         this.time = time;
